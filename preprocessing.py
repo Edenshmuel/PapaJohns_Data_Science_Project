@@ -123,7 +123,7 @@ def split_rows_by_category_and_quantity(df):
     keyword_dict = key_words()
 
     for _, row in df.iterrows():
-        base_data = row.drop(["כמות בפועל", "תאור פריט", "כמות"]).to_dict()
+        base_data = row.drop(["כמות בפועל", "תאור פריט", "כמות"], errors="ignore").to_dict()
         original = row["תאור פריט"] or ""
         quantity_dict = row.get("כמות בפועל", {})
         default_qty = row["כמות"]
