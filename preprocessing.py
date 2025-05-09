@@ -279,7 +279,7 @@ def add_product_features(df):
     df["portion_type"] = df["Cleaned Description"].apply(extract_portion_type)
 
     agg_features = df.groupby("clean_desc_encoded").agg({
-        "כמות": ["mean", "std"],
+        "Quantity": ["mean", "std"],
         "Date": "nunique"
     })
     agg_features.columns = ["avg_quantity_all_time", "std_quantity_all_time", "num_days_sold"]
