@@ -14,37 +14,24 @@ def drop(df):
     
 def convert_date(df):
     
+    df = df.copy()
+    
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-    weekday_map = {
-    0: 2,
-    1: 3,
-    2: 4,
-    3: 5,
-    4: 6,
-    5: 7,
-    6: 1}
-    
     df['Year'] = df['Date'].dt.year
+    df['Month'] = df['Date'].dt.month       
     df['Day'] = df['Date'].dt.day
-    df['Weekday'] = df['Date'].dt.dayofweek  # 0=Monday, 6=Sunday
-
-    df['Is_Weekend'] = df['Weekday'].isin([4, 5]).astype(int)
-    df['Day_Name'] = df['Weekday'].map(weekday_map)
+    df['Weekday'] = df['Date'].dt.dayofweek       # 0=Monday, 6=Sunday
     
-    columns_order = [
-    'Date',
-    'Year',
-    'Month',
-    'Day',
-    'Day_Name',
-    'Is_Weekend',
-    'תאור פריט',    
-    'הזמנה',    
-    'כמות', 
-    'סכום',]    
+    weekday_map = {0:2,1:3,2:4,3:5,4:6,5:7,6:1}
+    df['Is_Weekend'] = df['Weekday'].isin([4,5]).astype(int)
+    df['Day_Name']   = df['Weekday'].map(weekday_map)
 
-    df_all_years = df[columns_order].copy()
-    return df_all_years
+    columns_order = [
+        'Date','Year','Month','Day','Day_Name','Is_Weekend',
+        'תאור פריט','הזמנה','כמות','סכום',
+    ]
+    
+    return df[columns_order].copy()
 
 def key_words():
     main_dishes_keywords = ['ביאנקה', 'טוסקנית', 'היוונית', 'הצמחונית', 'קריביאן', 'פפרוני ספיישל', 'טוליפ', 'סופר פאפא' , 'המומלצת', 'הבשרית', 'קלאסית', 'מרגריטה', 'האיטלקית', 'ספייסי רול', 'מוצרלה סטיקס', 'הקשה של הפיצה',
@@ -71,6 +58,7 @@ def key_words():
     
 def split_category(df):
     
+    df = df.copy()
     keyword_dict = key_words()
  
     def categorize_item(description):
@@ -97,7 +85,6 @@ def split_category(df):
                 categories.add(cat)
         return list(categories) if categories else ["Other"]
 
-    df = df.copy()
     df["Description Categories"] = df["תאור פריט"].apply(categorize_components)
     return df
 
@@ -131,43 +118,44 @@ def find_phrase_in_text(text, keywords):
 
 def split_rows_by_category_and_quantity(df):
     
-    def clean_description_keep_numbers(text):
-        if pd.isna(text):
-            return ""
-        text = text.lower()
-        text = re.sub(r"[\[\]\"\'\+\-\(\)\.,]", "", text)
-        text = re.sub(r"\s{2,}", " ", text)
-        return text.strip()
-
+    df = df.copy()
     rows = []
     keyword_dict = key_words()
 
     for _, row in df.iterrows():
         base_data = row.drop(["כמות בפועל", "תאור פריט", "כמות"]).to_dict()
-        original_text = row["תאור פריט"].lower() if pd.notna(row["תאור פריט"]) else ""
+        original = row["תאור פריט"] or ""
         quantity_dict = row.get("כמות בפועל", {})
         default_qty = row["כמות"]
-        categories_in_desc = row.get("קטגוריות בתיאור")
+        categories = row.get("Description Categories", [])
+        
+        def clean_description_keep_numbers(text):
+            if pd.isna(text):
+                return ""
+            text = text.lower()
+            text = re.sub(r"[\[\]\"\'\+\-\(\)\.,]", "", text)
+            text = re.sub(r"\s{2,}", " ", text)
+            return text.strip()
 
-        if isinstance(categories_in_desc, list) and len(categories_in_desc) == 1:
-            category = categories_in_desc[0]
+        if isinstance(categories, list) and len(categories) == 1:
+            category = categories[0]
             qty = default_qty
-
             new_row = base_data.copy()
-            new_row["Item Description"] = row["תאור פריט"]
-            new_row["Cleaned Description"] = clean_description_keep_numbers(row["תאור פריט"])
+            new_row["Item Description"] = original
+            new_row["Cleaned Description"] = clean_description_keep_numbers(original)
             new_row["Category"] = category
             new_row["Quantity"] = qty
             rows.append(new_row)
 
+
         elif isinstance(quantity_dict, dict) and quantity_dict:
             for category, qty in quantity_dict.items():
-                new_row = base_data.copy()
-
+                phrase = None
                 keywords = keyword_dict.get(category)
-                phrase = find_phrase_in_text(original_text, keywords) if keywords else None
-
-                item_text = phrase if phrase else row["תאור פריט"]
+                if keywords:
+                    phrase = find_phrase_in_text(original.lower(), keywords)
+                item_text = phrase if phrase else original
+                new_row = base_data.copy()
                 new_row["Item Description"] = item_text
                 new_row["Cleaned Description"] = clean_description_keep_numbers(item_text)
                 new_row["Category"] = category
@@ -176,16 +164,14 @@ def split_rows_by_category_and_quantity(df):
 
         else:
             new_row = base_data.copy()
-            new_row["Item Description"] = row["תאור פריט"]
-            new_row["Cleaned Description"] = clean_description_keep_numbers(row["תאור פריט"])
+            new_row["Item Description"] = original
+            new_row["Cleaned Description"] = clean_description_keep_numbers(original)
             new_row["Quantity"] = default_qty
             new_row["Category"] = None
             rows.append(new_row)
 
     df_split = pd.DataFrame(rows)
-
     df_split = df_split[~df_split["Cleaned Description"].str.startswith("בלי")]
-
     return df_split
 
 def add_holiday_features(df):
@@ -365,8 +351,24 @@ def clean_final_columns(df):
 def sort_by_date(df):
     df = df.copy()
     df["Date"] = pd.to_datetime(df["Date"])
-    df_sorted = df.sort_values("Date")
-    return df_sorted
+    
+    return df.sort_values("Date")
+
+def prepare_data(df):
+    df = drop(df)
+    df = convert_date(df)
+    df = split_category(df)
+    df["כמות בפועל"] = df["תאור פריט"].apply(extract_quantity_by_keywords)
+    df = split_rows_by_category_and_quantity(df)
+    df = add_holiday_features(df)
+    df = encode_features(df)
+    df = add_time_features(df)
+    df = add_product_features(df)
+    df = encode_holiday_and_portion(df)
+    df = clean_final_columns(df)
+    df = sort_by_date(df)
+    
+    return df
 
 
 
