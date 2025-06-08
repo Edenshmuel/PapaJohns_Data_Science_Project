@@ -1,3 +1,8 @@
+#from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
+from collections import Counter
+from fuzzywuzzy import fuzz
 from sklearn.preprocessing import LabelEncoder
 from datetime import date, timedelta
 from convertdate import hebrew
@@ -5,6 +10,7 @@ import pandas as pd
 import numpy as np
 import holidays
 import re
+
 
 def drop(df):
 
@@ -34,79 +40,65 @@ def convert_date(df):
     return df[columns_order].copy()
 
 def key_words():
-    main_dishes_keywords = ['ביאנקה', 'טוסקנית', 'היוונית', 'הצמחונית', 'קריביאן', 'פפרוני ספיישל', 'טוליפ', 'סופר פאפא' , 'המומלצת', 'הבשרית', 'קלאסית', 'מרגריטה', 'האיטלקית', 'ספייסי רול', 'מוצרלה סטיקס', 'הקשה של הפיצה',
-                            'פפיוני שום פרמזן', 'טבעות', 'לחמעג\'ון', 'צ\'יזי רול', 'נאגטס', 'נגיסי', 'פיצה', 'פיצות', 'משפחתית', 'משפחתי', 'אישית', 'איטסיין', 'פריקסה', 'סופר פאפא', 'קראסט', 'כדורי פירה', 'הוט-דוג', 'כדורי בשר',
-                            'ארוחה', 'ארוחות', 'פאפאדיאס', 'קלאסי', 'הבלקנית', 'הספרדית', 'הצרפתית', 'סלופי', 'מנה', 'ציפס', '8', '14', '16', 'בייטס', 'עקיצת הדבורה']
+    main_dishes_keywords = ['ביאנקה', 'היוונית', 'הצמחונית','טונה דה לקס', 'קריביאן', 'פפרוני ספיישל', 'טוליפ', 'סופר פאפא' , 'המומלצת', 'הבשרית', 'קלאסית', 'מרגריטה', 'האיטלקית', 'ספייסי רול', 'מוצרלה סטיקס'
+                           , 'לחמעג\'ון', 'פיצה', 'משפחתיות', 'פיצות', 'משפחתית', 'משפחתי', 'אישית', 'איטסיין', 'פריקסה', 'סופר פאפא','מרגריטות', 'צ\'יזי טונה', 'קלמטה גבינות',
+                            'ארוחה', 'ארוחות', 'פאפאדיאס','קלאסיות', 'קלאסי', 'הבלקנית', 'הספרדית', 'הצרפתית', 'סלופי', 'מנה', 'בייטס', 'עקיצת הדבורה','דקה']
+
+    side_dishes_keywords = [
+        "צ\'יפס", "אצבעות גבינה", "אצבעות", "בייטס", "נאגטס", "כדורי פירה", 'הקשה של הפיצה', 'פפיוני שום פרמזן' , 'טבעות', 'נגיסי', 'כדורי בשר', 'קראסט', 'הוט-דוג',
+        "כדורי גבינה", "מוצרלה סטיקס", 'צ\'יזי רול', "פפיוני שום", 'מנות נלוות',"סלט"]
 
     desserts_keywords = ['קראנצ', 'פיסטוק', 'בייגלה', 'קרמל', 'שוקולד', 'בלונדי', 'ריקוטה', 'עוגיות', 'גלידה', 'גלידות', 'מגנום', 'קינוח', 'וניל', 'דולצה', 'צ\'אנקי', 'בראוניס', 'טופי', 'אוראו', 'מקופלת',
                          'אגוזי', 'קליק', 'קרם', 'נוגט', 'פירות', 'שמנת', 'קינדר', 'רול']
 
-    toppings_keywords = ['זית', 'תירס', 'אננס', 'בצל', 'פטריות', 'עגבניות', 'גמבה', 'פלפל', 'חלפיניו', 'גבינה', 'גבינות', 'תוספת', 'ארטישוק', 'בולגרית', 'טונה', 'אנשובי', 'פפרוני', 'מוצרלה', 'פפרוצ\'יני',
-                         'קלמטה', 'עיזים', 'חצי', 'תוספות']
+    toppings_keywords = ['זית', 'זיתים ירוקים','תירס', 'אננס', 'בצל', 'פטריות', 'עגבניות', 'גמבה', 'פלפל', 'חלפיניו',  'גבינות',"6 גבינות", 'תוספת', 'ארטישוק', 'בולגרית', 'טונה', 'אנשובי', 'פפרוני', 'מוצרלה', 'פפרוצ\'יני',
+                        'עיזים', 'חצי', 'תוס' ,'תוספות']
 
-    sauces_keywords = ["רוטב", "מארז רטבים", "תבלין", 'אורגנו']
+    sauces_keywords = ["רוטב", "מארז רטבים", "תבלין", 'אורגנו', "רטבים"]
 
-    drinks_keywords = ["קולה", "מים", "ספרייט", "פחית", "זירו", "מונסטר", "פריגת", "פיוז טי", "משקה", "שתייה", 'פאנטה', 'שתיה']
+    drinks_keywords = ["סודה","קולה", "מים", 'פחיות',"ספרייט", "פחית", "זירו", "מונסטר", "פריגת", "פיוז טי", "משקה", "שתייה", 'פאנטה', 'בקבוק','שתיה']
 
     return {
         "Main Dish": main_dishes_keywords,
         "Dessert": desserts_keywords,
         "Topping": toppings_keywords,
         "Sauce": sauces_keywords,
-        "Drink": drinks_keywords
+        "Drink": drinks_keywords,
+        "Side Dish": side_dishes_keywords,
     }
-
-def split_category(df):
-
-    df = df.copy()
-    keyword_dict = key_words()
-
-    def categorize_item(description):
-        if pd.isna(description):
-            return "Other"
-        desc = description.lower()
-        for category, keywords in keyword_dict.items():
-            if any(word in desc for word in keywords):
-                return category
-        return "Other"
-
-    def split_description(text):
-        if pd.isna(text):
-            return []
-        text = text.lower()
-        return re.split(r'\+|/|&| ו ', text)
-
-    def categorize_components(text):
-        components = split_description(text)
-        categories = set()
-        for comp in components:
-            cat = categorize_item(comp.strip())
-            if cat != "Other":
-                categories.add(cat)
-        return list(categories) if categories else ["Other"]
-
-    df["Description Categories"] = df["תאור פריט"].apply(categorize_components)
-
-    return df
 
 def extract_quantity_by_keywords(text):
     if pd.isna(text):
-        return {}
+        return {}, {}
 
     text = text.lower()
-    result = {}
+    keyword_dict = key_words()
+    forbidden_units = {"יח", "יחידות", "ליטר", "ל", "מל"}
+    size_tokens = {"8", "14", "16"}
+    words = text.split()
+    quantity_map = {}
+    phrase_map = {}
 
-    category_keywords = key_words()
+    for i, word in enumerate(words):
+        if word.isdigit():
+            num = int(word)
+            if num > 150:
+                continue
+            if str(num) in size_tokens:
+                continue
+            if (i + 1 < len(words)) and (words[i + 1] in forbidden_units):
+                continue
 
-    for category, keywords in category_keywords.items():
-        for kw in keywords:
-            pattern = rf"(\d+)\s*{re.escape(kw)}"
-            matches = re.findall(pattern, text)
-            for m in matches:
-                num = int(m)
-                result[category] = result.get(category, 0) + num
+            for offset in [-2, -1, 1, 2]:
+                idx = i + offset
+                if 0 <= idx < len(words):
+                    neighbor = words[idx]
+                    for category, keywords in keyword_dict.items():
+                        if any(kw in neighbor for kw in keywords):
+                            quantity_map[category] = quantity_map.get(category, 0) + num
+                            phrase_map[category] = f"{num} {neighbor}"
 
-    return result
+    return quantity_map, phrase_map
 
 def find_phrase_in_text(text, keywords):
     for kw in keywords:
@@ -114,77 +106,321 @@ def find_phrase_in_text(text, keywords):
             pattern = rf"(\d+\s*[\w\s\-'״״\"׳]*{re.escape(kw)}[\w\s\-'״״\"׳]*)"
             match = re.search(pattern, text)
             if match:
-                return match.group(1).strip()
+                phrase = match.group(1).strip()
+                phrase = re.sub(r'\b\d+\b', '', phrase)
+                return phrase.strip()
     return None
 
+
+def has_separators(text):
+    return any(sep in text for sep in ['+', '/', '&', ' ו ', 'ו', ','])
+
+def split_by_category_sequence(text, keyword_dict):
+    words = text.lower().split()
+    result = []
+    current_group = []
+    current_category = None
+
+    def detect_category(word):
+        for cat, keywords in keyword_dict.items():
+            if any(kw in word for kw in keywords):
+                return cat
+        return None
+
+    for word in words:
+        word_cat = detect_category(word)
+
+        if current_group:
+            if word_cat != current_category and word_cat is not None:
+                result.append(" ".join(current_group))
+                current_group = [word]
+                current_category = word_cat
+            else:
+                current_group.append(word)
+        else:
+            current_group = [word]
+            current_category = word_cat
+
+    if current_group:
+        result.append(" ".join(current_group))
+
+    return [re.sub(r'\s{2,}', ' ', g.strip()) for g in result if g.strip()]
+
+def extract_main_dish_prefix(text, size_tokens={"8", "14", "16"}):
+    text = text.lower()
+    separators = {"+", "/", "&", ",", "ו"}
+    tokens = text.split()
+
+    for i, token in enumerate(tokens):
+        token_clean = re.sub(r"[^\d]", "", token)
+        if token_clean in size_tokens:
+            j = i - 1
+            while j >= 0:
+                if tokens[j] in separators:
+                    break
+                j -= 1
+            main_dish_words = tokens[j+1 : i+1]
+            if not main_dish_words:
+                return None, text
+
+            prefix = " ".join(main_dish_words).strip()
+            remaining_tokens = tokens[: j+1] + tokens[i+1 :]
+            remainder = " ".join(remaining_tokens).strip()
+            remainder = re.sub(r"\s{2,}", " ", remainder)
+            return prefix, remainder
+
+    return None, text
 
 def split_rows_by_category_and_quantity(df):
     df = df.copy()
     rows = []
     keyword_dict = key_words()
+    size_tokens = {"8", "14", "16"}
 
     for _, row in df.iterrows():
-        base_data = row.drop(["כמות בפועל", "תאור פריט", "כמות"], errors="ignore").to_dict()
+        base_data = row.drop(["תאור פריט", "כמות"], errors="ignore").to_dict()
+
+        fallback_qty = row.get("כמות", 1)
+        fallback_qty = int(fallback_qty) if pd.notna(fallback_qty) and str(fallback_qty).isdigit() else 1
 
         original = row.get("תאור פריט", "")
         original = original if pd.notna(original) else ""
         original_text = original.lower()
 
-        quantity_dict = row.get("כמות בפועל", {})
-        default_qty = row.get("כמות", 0)
-        categories = row.get("Description Categories", [])
+        main_dish_prefix, remainder_text = extract_main_dish_prefix(original_text, size_tokens)
+        if main_dish_prefix:
+            cleaned_prefix = re.sub(r"[\[\]\"\'\+\-\(\)\.,]", "", main_dish_prefix)
+            cleaned_prefix = re.sub(r"\s{2,}", " ", cleaned_prefix).strip()
 
-        def clean_description_keep_numbers(text):
-            if pd.isna(text):
-                return ""
-            text = text.lower()
-            text = re.sub(r"[\[\]\"\'\+\-\(\)\.,]", "", text)
-            text = re.sub(r"\s{2,}", " ", text)
-            return text.strip()
-
-        # Case 1: only one category
-        if isinstance(categories, list) and len(categories) == 1:
-            category = categories[0]
-            qty = default_qty
-            cleaned = clean_description_keep_numbers(original)
             new_row = base_data.copy()
-            new_row["Item Description"] = cleaned
-            new_row["Cleaned Description"] = cleaned
-            new_row["Category"] = category
-            new_row["Quantity"] = qty
+            new_row["Item Description"] = cleaned_prefix
+            new_row["Cleaned Description"] = cleaned_prefix
+            new_row["Quantity"] = fallback_qty
+            new_row["Category"] = "Main Dish"
             rows.append(new_row)
 
-        # Case 2: multiple categories with quantity dict
-        elif isinstance(quantity_dict, dict) and quantity_dict:
-            for category, qty in quantity_dict.items():
-                phrase = None
-                keywords = keyword_dict.get(category)
-                if keywords:
-                    phrase = find_phrase_in_text(original_text, keywords)
-                item_text = phrase if phrase else original
-                cleaned = clean_description_keep_numbers(item_text)
+            original_text = remainder_text
+            if not original_text.strip():
+                continue
+
+        quantity_map, _ = extract_quantity_by_keywords(original_text)
+
+        #Case 1:
+        if has_separators(original_text):
+            components = re.split(r'\+|/|&|,|\s+ו(?=[\u0590-\u05FF])', original_text)
+            for comp in components:
+                comp = comp.strip()
+                category = None
+                quantity = fallback_qty
+
+                for cat, keywords in keyword_dict.items():
+                    if any(kw in comp for kw in keywords):
+                        category = cat
+                        break
+
+                if category and category in quantity_map:
+                    for kw in keyword_dict[category]:
+                        pattern = rf"\b(\d+)\s*{re.escape(kw)}|\b{re.escape(kw)}\s*(\d+)\b"
+                        match = re.search(pattern, comp)
+                        if match:
+                            quantity = int(match.group(1) or match.group(2))
+                            full_match = match.group(0)
+                            cleaned_match = re.sub(rf"\b{quantity}\b", "", full_match).strip()
+                            comp = comp.replace(full_match, cleaned_match, 1)
+                            break
+
+                cleaned = re.sub(r"[\[\]\"\'\+\-\(\)\.,]", "", comp)
+                cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+
                 new_row = base_data.copy()
                 new_row["Item Description"] = cleaned
                 new_row["Cleaned Description"] = cleaned
+                new_row["Quantity"] = quantity
                 new_row["Category"] = category
-                new_row["Quantity"] = qty
                 rows.append(new_row)
 
-        # Case 3: fallback when info is missing
-        else:
-            cleaned = clean_description_keep_numbers(original)
-            new_row = base_data.copy()
-            new_row["Item Description"] = cleaned
-            new_row["Cleaned Description"] = cleaned 
-            new_row["Quantity"] = default_qty
-            new_row["Category"] = None
-            rows.append(new_row)
+        #Case 2:
+        elif quantity_map:
+            text_cleaned = original_text
 
-    # Final DataFrame and filter
+            for category, qty in quantity_map.items():
+                for kw in keyword_dict.get(category, []):
+                    pattern = rf"\b(\d+)\s*{re.escape(kw)}|\b{re.escape(kw)}\s*(\d+)\b"
+                    matches = list(re.finditer(pattern, text_cleaned))
+                    for match in matches:
+                        number = match.group(1) or match.group(2)
+                        if number and int(number) == qty:
+                            full_match = match.group(0)
+                            cleaned_match = re.sub(rf"\b{number}\b", "", full_match).strip()
+                            text_cleaned = text_cleaned.replace(full_match, cleaned_match, 1)
+                            break
+
+            used_categories = set()
+
+            for category, qty in quantity_map.items():
+                if category in used_categories:
+                    continue
+                used_categories.add(category)
+
+                phrase = find_phrase_in_text(text_cleaned, keyword_dict.get(category, [])) or text_cleaned
+                cleaned = re.sub(rf'\b{qty}\b', '', phrase)
+                cleaned = re.sub(r"[\[\]\"\'\+\-\(\)\.,]", "", cleaned)
+                cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+
+                new_row = base_data.copy()
+                new_row["Item Description"] = cleaned
+                new_row["Cleaned Description"] = cleaned
+                new_row["Quantity"] = qty
+                new_row["Category"] = category
+                rows.append(new_row)
+
+        #Case 3:
+        else:
+            components = split_by_category_sequence(original_text, keyword_dict)
+            for comp in components:
+                cleaned = re.sub(r"[\[\]\"\'\+\-\(\)\.,]", "", comp)
+                cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+
+                category = None
+                for cat, keywords in keyword_dict.items():
+                    if any(kw in cleaned for kw in keywords):
+                        category = cat
+                        break
+
+                new_row = base_data.copy()
+                new_row["Item Description"] = cleaned
+                new_row["Cleaned Description"] = cleaned
+                new_row["Quantity"] = fallback_qty
+                new_row["Category"] = category
+                rows.append(new_row)
+
     df_split = pd.DataFrame(rows)
     df_split = df_split[~df_split["Cleaned Description"].str.startswith("בלי")]
-
+    df_split = df_split[~df_split["Cleaned Description"].str.startswith("שובר")]
+    df_split = df_split[~df_split["Cleaned Description"].str.startswith("מבצע")]
     return df_split
+
+def group_similar_descriptions_with_size(descs, sizes, threshold=87, top_k=10):
+    groups = {}
+    seen = set()
+    vectorizer = TfidfVectorizer(ngram_range=(1, 2), analyzer='word', min_df=1)
+    vectors = vectorizer.fit_transform(descs)
+    sim_matrix = cosine_similarity(vectors)
+
+    for i in range(len(descs)):
+        if i in seen:
+            continue
+        group = [i]
+        seen.add(i)
+        for j in sim_matrix[i].argsort()[::-1][1:top_k + 1]:
+            if j in seen or sizes[i] != sizes[j]:
+                continue
+            if fuzz.ratio(descs[i], descs[j]) >= threshold:
+                group.append(j)
+                seen.add(j)
+
+        group_texts = [descs[k] for k in group]
+        canonical = Counter(group_texts).most_common(1)[0][0]
+        for k in group:
+            groups[descs[k]] = canonical
+
+    return groups
+
+def clean_description_for_similarity(text):
+    text = str(text).lower()
+
+    marketing_words = {
+        "מבצע", "במבצע", "שובר", "חדש", "הטבה", "חינם", "שח", "₪", "ש\"ח", "מחיר",
+        "עם", "בלי", "ללא", "בתוספת", "תוספת", "נוסח", "ועוד", "ומעט", "מעט", "rl"
+    }
+    for word in marketing_words:
+        text = text.replace(word, "")
+
+    typo_corrections = {
+        "קלסית": "קלאסית",
+        "משפחתיות": "משפחתית",
+        "אישיות": "אישית",
+        "קינוחים": "קינוח",
+        "צמחוניות": "צמחונית",
+        "שתיה": "שתייה",
+        "ושתייה": "שתייה",
+        "פיצות": "פיצה",
+        "זיתים ורים": "זיתים ירוקים",
+        "משפחתי": "משפחתית"}
+
+    for typo, corrected in typo_corrections.items():
+        text = text.replace(typo, corrected)
+
+    keep_if_near_units = {"יח", "יחידות", "ליטר", "ל", "מל"}
+    always_allowed_numbers = {"8", "14", "16", "0.5", "1", "1.5", "15"}
+
+    tokens = text.split()
+    cleaned_tokens = []
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        next_token = tokens[i + 1] if i + 1 < len(tokens) else ""
+        prev_token = tokens[i - 1] if i > 0 else ""
+
+        if re.fullmatch(r"\d+(\.\d+)?", token):
+            keep = (
+                    token in always_allowed_numbers or
+                    next_token in keep_if_near_units or
+                    prev_token in keep_if_near_units)
+            if keep:
+                cleaned_tokens.append(token)
+        else:
+            cleaned_tokens.append(token)
+        i += 1
+
+    cleaned = " ".join(cleaned_tokens)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    return cleaned
+
+def extract_pizza_size(text):
+    match = re.search(r"\b(8|14|16)\b", text)
+    return match.group(0) if match else None
+
+def similar_categories_with_size_check(df, default_threshold=85):
+    df = df.copy()
+    all_rows = []
+
+    threshold_per_category = {
+        "Main Dish": 90,
+        "Topping": 87,
+        "Dessert": 87,
+        "Side Dish": 87,
+        "Drink": 90,
+        "Sauce": 87
+    }
+
+    for category in df["Category"].dropna().unique():
+        df_cat = df[df["Category"] == category].copy()
+
+        descs = df_cat["Cleaned Description"].dropna().astype(str).unique()
+        descs = sorted(descs)
+
+        sizes = [extract_pizza_size(desc) for desc in descs]
+        cleaned_descs = [clean_description_for_similarity(d) for d in descs]
+
+        threshold = threshold_per_category.get(category, default_threshold)
+        desc_to_canonical = group_similar_descriptions_with_size(
+            cleaned_descs, sizes, threshold=threshold, top_k=10)
+
+        mapping = {}
+        for desc in descs:
+            cleaned = clean_description_for_similarity(desc)
+            canonical_cleaned = desc_to_canonical.get(cleaned, cleaned)
+            mapping[desc] = canonical_cleaned
+
+        df_cat["Cleaned Description Normalized"] = df_cat["Cleaned Description"].map(mapping).fillna(
+            df_cat["Cleaned Description"])
+        df_cat["pizza_size"] = df_cat["Cleaned Description"].apply(extract_pizza_size)
+
+        all_rows.append(df_cat)
+
+    df_final = pd.concat(all_rows, ignore_index=True)
+    return df_final
 
 def add_holiday_features(df):
     df = df.copy()
@@ -351,9 +587,9 @@ def encode_holiday_and_portion(df):
 def clean_final_columns(df):
     df = df.copy()
 
-    df = df.drop(columns=["קטגוריות בתיאור", "Category", "Cleaned Description"], errors="ignore")
+    df = df.drop(columns=["קטגוריות בתיאור", "Description Categories", "Item Description"], errors="ignore")
     df = df.drop(columns=["jewish_holiday_name", "christian_holiday_name", "portion_type"], errors="ignore")
-    df = df.drop(columns=["order", "סכום"], errors="ignore")
+    df = df.drop(columns=["order" ,"סכום"], errors="ignore")
 
     return df
 
@@ -366,9 +602,8 @@ def sort_by_date(df):
 def prepare_data(df):
     df = drop(df)
     df = convert_date(df)
-    df = split_category(df)
-    df["כמות בפועל"] = df["תאור פריט"].apply(extract_quantity_by_keywords)
     df = split_rows_by_category_and_quantity(df)
+    df = similar_categories_with_size_check(df)
     df = add_holiday_features(df)
     df = encode_features(df)
     df = add_time_features(df)
