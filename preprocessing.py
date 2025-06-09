@@ -1,4 +1,3 @@
-#from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import Counter
@@ -10,7 +9,6 @@ import pandas as pd
 import numpy as np
 import holidays
 import re
-
 
 def drop(df):
 
@@ -300,7 +298,7 @@ def split_rows_by_category_and_quantity(df):
     df_split = df_split[~df_split["Cleaned Description"].str.startswith("מבצע")]
     return df_split
 
-def group_similar_descriptions_with_size(descs, sizes, threshold=87, top_k=10):
+def group_similar_descriptions_with_size(descs, sizes, threshold=90, top_k=10):
     groups = {}
     seen = set()
     vectorizer = TfidfVectorizer(ngram_range=(1, 2), analyzer='word', min_df=1)
@@ -338,7 +336,7 @@ def clean_description_for_similarity(text):
 
     typo_corrections = {
         "קלסית": "קלאסית",
-        "משפחתיות": "משפחתית",
+        "משפחתיות ": "משפחתית",
         "אישיות": "אישית",
         "קינוחים": "קינוח",
         "צמחוניות": "צמחונית",
@@ -346,7 +344,7 @@ def clean_description_for_similarity(text):
         "ושתייה": "שתייה",
         "פיצות": "פיצה",
         "זיתים ורים": "זיתים ירוקים",
-        "משפחתי": "משפחתית"}
+        "משפחתי ": "משפחתית"}
 
     for typo, corrected in typo_corrections.items():
         text = text.replace(typo, corrected)
@@ -421,6 +419,26 @@ def similar_categories_with_size_check(df, default_threshold=85):
 
     df_final = pd.concat(all_rows, ignore_index=True)
     return df_final
+
+
+def fill_missing_categories_with_model(df, model, index_to_category, feature_col, threshold=0.9):
+    df = df.copy()
+    mask = df['Category'].isna()
+
+    if mask.any():
+        texts = df.loc[mask, feature_col].astype(str)
+        probas = model.predict_proba(texts)
+        preds = model.predict(texts)
+        max_probas = probas.max(axis=1)
+
+        final_cats = [
+            index_to_category[pred] if prob >= threshold else None
+            for pred, prob in zip(preds, max_probas)
+        ]
+
+        df.loc[mask, 'Category'] = final_cats
+
+    return df
 
 def add_holiday_features(df):
     df = df.copy()
@@ -588,7 +606,7 @@ def clean_final_columns(df):
     df = df.copy()
 
     df = df.drop(columns=["קטגוריות בתיאור", "Description Categories", "Item Description"], errors="ignore")
-    df = df.drop(columns=["jewish_holiday_name", "christian_holiday_name", "portion_type"], errors="ignore")
+    df = df.drop(columns=["jewish_holiday_name", "christian_holiday_name", "portion_type", "pizza_size"], errors="ignore")
     df = df.drop(columns=["order" ,"סכום"], errors="ignore")
 
     return df
@@ -604,6 +622,8 @@ def prepare_data(df):
     df = convert_date(df)
     df = split_rows_by_category_and_quantity(df)
     df = similar_categories_with_size_check(df)
+    df = fill_missing_categories_with_model(df, model,index_to_category=index_to_category,
+                                            feature_col='Cleaned Description Normalized', threshold=0.9)
     df = add_holiday_features(df)
     df = encode_features(df)
     df = add_time_features(df)
