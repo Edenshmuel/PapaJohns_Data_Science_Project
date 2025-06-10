@@ -11,13 +11,11 @@ import holidays
 import re
 
 def drop(df):
-
     df.dropna(inplace=True)
-    df = df[df["כמות"] >= 0]
+    df = df[df["כמות"] > 0]
     return df
 
 def convert_date(df):
-
     df = df.copy()
 
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
@@ -445,8 +443,8 @@ def add_holiday_features(df):
     df["Date"] = pd.to_datetime(df["Date"])
 
     us_holidays = holidays.US()
-    df["is_christian_holiday"] = df["Date"].dt.date.apply(lambda x: x in us_holidays)
-    df["christian_holiday_name"] = df["Date"].dt.date.apply(lambda x: us_holidays.get(x) if x in us_holidays else None)
+    df["Is_Christian_Holiday"] = df["Date"].dt.date.apply(lambda x: x in us_holidays)
+    df["Christian_Holiday_Name"] = df["Date"].dt.date.apply(lambda x: us_holidays.get(x) if x in us_holidays else None)
 
     jewish_holidays = {
     "Rosh Hashanah": [(1, 1), (2, 1)],
@@ -469,7 +467,7 @@ def add_holiday_features(df):
         return False, None
 
     jewish_flags = df["Date"].dt.date.apply(get_jewish_holiday_info)
-    df["is_jewish_holiday"], df["jewish_holiday_name"] = zip(*jewish_flags)
+    df["Is_Jewish_Holiday"], df["Jewish_Holiday_Name"] = zip(*jewish_flags)
 
     all_holiday_dates = []
     for year in df["Date"].dt.year.unique():
@@ -486,9 +484,9 @@ def add_holiday_features(df):
         for offset in range(-2, 3):
             near_holiday_dates.add(d + timedelta(days=offset))
 
-    df["is_near_jewish_holiday"] = df["Date"].dt.date.apply(lambda x: x in near_holiday_dates)
+    df["Is_Near_Jewish_Holiday"] = df["Date"].dt.date.apply(lambda x: x in near_holiday_dates)
 
-    df["is_day_before_new_year"] = (df["Date"].dt.month == 12) & (df["Date"].dt.day == 31)
+    df["Is_Day_Before_New_Year"] = (df["Date"].dt.month == 12) & (df["Date"].dt.day == 31)
 
     return df
 
@@ -499,17 +497,17 @@ def encode_features(df):
     df.drop(columns=["הזמנה"], inplace=True)
 
     codes, uniques = pd.factorize(df["Cleaned Description"])
-    df["clean_desc_encoded"] = codes
+    df["Clean_Desc_Encoded"] = codes
 
     desc_mapping = {val: i for i, val in enumerate(uniques)}
-    pd.Series(desc_mapping).to_csv("desc_encoding_map.csv", header=["code"], encoding="utf-8-sig")
+    pd.Series(desc_mapping).to_csv("Desc_encoding_map.csv", header=["code"], encoding="utf-8-sig")
 
     le = LabelEncoder()
-    df["category_encoded"] = le.fit_transform(df["Category"].astype(str))
+    df["Category_Encoded"] = le.fit_transform(df["Category"].astype(str))
 
     category_mapping = dict(zip(le.classes_, le.transform(le.classes_)))
     mapping_df = pd.DataFrame(list(category_mapping.items()), columns=["Category", "Code"])
-    mapping_df.to_csv("category_mapping.csv", index=False, encoding="utf-8-sig")
+    mapping_df.to_csv("Category_mapping.csv", index=False, encoding="utf-8-sig")
 
     return df
 
@@ -519,14 +517,14 @@ def add_time_features(df):
     df["WeekOfYear"] = df["Date"].dt.isocalendar().week
     df["Season"] = (df["Month"] % 12 // 3 + 1)
 
-    df["is_start_of_month"] = (df["Day"] <= 3).astype(int)
-    df["is_end_of_month"] = (df["Day"] >= 28).astype(int)
+    df["Is_Start_of_Month"] = (df["Day"] <= 3).astype(int)
+    df["Is_End_of_Month"] = (df["Day"] >= 28).astype(int)
 
-    df["Day_Name_sin"] = np.sin(2 * np.pi * df["Day_Name"] / 7)
-    df["Day_Name_cos"] = np.cos(2 * np.pi * df["Day_Name"] / 7)
+    df["Day_Name_Sin"] = np.sin(2 * np.pi * df["Day_Name"] / 7)
+    df["Day_Name_Cos"] = np.cos(2 * np.pi * df["Day_Name"] / 7)
 
-    df["Month_sin"] = np.sin(2 * np.pi * df["Month"] / 12)
-    df["Month_cos"] = np.cos(2 * np.pi * df["Month"] / 12)
+    df["Month_Sin"] = np.sin(2 * np.pi * df["Month"] / 12)
+    df["Month_Cos"] = np.cos(2 * np.pi * df["Month"] / 12)
 
     return df
 
@@ -542,24 +540,24 @@ def add_product_features(df):
                 return "אישית"
         return "מנה"
 
-    df["portion_type"] = df["Cleaned Description"].apply(extract_portion_type)
+    df["Portion_Type"] = df["Cleaned Description"].apply(extract_portion_type)
 
-    agg_features = df.groupby("clean_desc_encoded").agg({
+    agg_features = df.groupby("Clean_Desc_Encoded").agg({
         "Quantity": ["mean", "std"],
         "Date": "nunique"
     })
-    agg_features.columns = ["avg_quantity_all_time", "std_quantity_all_time", "num_days_sold"]
+    agg_features.columns = ["Avg_Quantity_All_Time", "Std_Quantity_All_Time", "Num_Days_Sold"]
     agg_features = agg_features.reset_index()
 
-    agg_features["popularity_score"] = agg_features["avg_quantity_all_time"]
+    agg_features["Popularity_Score"] = agg_features["Avg_Quantity_All_Time"]
 
-    portion_type_map = df.groupby("clean_desc_encoded")["portion_type"].first().reset_index()
+    portion_type_map = df.groupby("Clean_Desc_Encoded")["Portion_Type"].first().reset_index()
 
-    df = df.merge(agg_features, on="clean_desc_encoded", how="left")
-    df = df.merge(portion_type_map, on="clean_desc_encoded", how="left", suffixes=("", "_final"))
+    df = df.merge(agg_features, on="Clean_Desc_Encoded", how="left")
+    df = df.merge(portion_type_map, on="Clean_Desc_Encoded", how="left", suffixes=("", "_final"))
 
-    df["portion_type"] = df["portion_type_final"]
-    df.drop(columns=["portion_type_final"], inplace=True)
+    df["Portion_Type"] = df["Portion_Type_Final"]
+    df.drop(columns=["Portion_Type_Final"], inplace=True)
 
     return df
 
@@ -567,9 +565,9 @@ def encode_holiday_and_portion(df):
     df = df.copy()
 
     # Fill missing values
-    df["jewish_holiday_name"] = df["jewish_holiday_name"].fillna("none")
-    df["christian_holiday_name"] = df["christian_holiday_name"].fillna("none")
-    df["portion_type"] = df["portion_type"].fillna("none")
+    df["Jewish_Holiday_Name"] = df["Jewish_Holiday_Name"].fillna("none")
+    df["Christian_Holiday_Name"] = df["Christian_Holiday_Name"].fillna("none")
+    df["Portion_Type"] = df["Portion_Type"].fillna("none")
 
     # Create label encoders
     jewish_encoder = LabelEncoder()
@@ -577,28 +575,28 @@ def encode_holiday_and_portion(df):
     portion_encoder = LabelEncoder()
 
     # Encode columns
-    df["encoded_jewish_holiday"] = jewish_encoder.fit_transform(df["jewish_holiday_name"])
-    df["encoded_christian_holiday"] = christian_encoder.fit_transform(df["christian_holiday_name"])
-    df["encoded_portion_type"] = portion_encoder.fit_transform(df["portion_type"])
+    df["Encoded_Jewish_Holiday"] = jewish_encoder.fit_transform(df["Jewish_Holiday_Name"])
+    df["Encoded_Christian_Holiday"] = christian_encoder.fit_transform(df["Christian_Holiday_Name"])
+    df["Encoded_Portion_Type"] = portion_encoder.fit_transform(df["Portion_Type"])
 
     # Create and save mapping files
     jewish_map = pd.DataFrame({
-        "jewish_holiday_name": jewish_encoder.classes_,
-        "encoded_value": jewish_encoder.transform(jewish_encoder.classes_)
+        "Jewish_Holiday_Name": jewish_encoder.classes_,
+        "Encoded_Value": jewish_encoder.transform(jewish_encoder.classes_)
     })
-    jewish_map.to_csv("jewish_map_path.csv", index=False, encoding="utf-8-sig")
+    jewish_map.to_csv("Jewish_Map_Path.csv", index=False, encoding="utf-8-sig")
 
     christian_map = pd.DataFrame({
-        "christian_holiday_name": christian_encoder.classes_,
-        "encoded_value": christian_encoder.transform(christian_encoder.classes_)
+        "Christian_Holiday_Name": christian_encoder.classes_,
+        "Encoded_Value": christian_encoder.transform(christian_encoder.classes_)
     })
-    christian_map.to_csv("christian_map_path.csv", index=False, encoding="utf-8-sig")
+    christian_map.to_csv("Christian_Map_Path.csv", index=False, encoding="utf-8-sig")
 
     portion_map = pd.DataFrame({
-        "portion_type": portion_encoder.classes_,
-        "encoded_value": portion_encoder.transform(portion_encoder.classes_)
+        "Portion_Type": portion_encoder.classes_,
+        "Encoded_Value": portion_encoder.transform(portion_encoder.classes_)
     })
-    portion_map.to_csv("portion_map_path.csv", index=False, encoding="utf-8-sig")
+    portion_map.to_csv("Portion_Map_Path.csv", index=False, encoding="utf-8-sig")
 
     return df
 
@@ -606,7 +604,7 @@ def clean_final_columns(df):
     df = df.copy()
 
     df = df.drop(columns=["קטגוריות בתיאור", "Description Categories", "Item Description"], errors="ignore")
-    df = df.drop(columns=["jewish_holiday_name", "christian_holiday_name", "portion_type", "pizza_size"], errors="ignore")
+    df = df.drop(columns=["Jewish_Holiday_Name", "Christian_Holiday_Name", "Portion_Type", "pizza_size"], errors="ignore")
     df = df.drop(columns=["order" ,"סכום"], errors="ignore")
 
     return df
@@ -614,7 +612,6 @@ def clean_final_columns(df):
 def sort_by_date(df):
     df = df.copy()
     df["Date"] = pd.to_datetime(df["Date"])
-
     return df.sort_values("Date")
 
 def prepare_data(df):
