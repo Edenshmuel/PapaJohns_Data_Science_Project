@@ -555,7 +555,7 @@ def add_product_features(df):
     portion_type_map = df.groupby("Clean_Desc_Encoded")["Portion_Type"].first().reset_index()
 
     df = df.merge(agg_features, on="Clean_Desc_Encoded", how="left")
-    df = df.merge(portion_type_map, on="Clean_Desc_Encoded", how="left", suffixes=("", "_final"))
+    df = df.merge(portion_type_map, on="Clean_Desc_Encoded", how="left", suffixes=("", "_Final"))
 
     df["Portion_Type"] = df["Portion_Type_Final"]
     df.drop(columns=["Portion_Type_Final"], inplace=True)
