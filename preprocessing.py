@@ -335,7 +335,7 @@ def clean_description_for_similarity(text):
 
     typo_corrections = {
         "קלסית": "קלאסית",
-        "משפחתיות ": "משפחתית",
+        "משפחתיות ": "משפחתית ",
         "אישיות": "אישית",
         "קינוחים": "קינוח",
         "צמחוניות": "צמחונית",
@@ -343,7 +343,7 @@ def clean_description_for_similarity(text):
         "ושתייה": "שתייה",
         "פיצות": "פיצה",
         "זיתים ורים": "זיתים ירוקים",
-        "משפחתי ": "משפחתית"}
+        "משפחתי ": "משפחתית "}
 
     for typo, corrected in typo_corrections.items():
         text = text.replace(typo, corrected)
