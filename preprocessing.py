@@ -10,6 +10,7 @@ import numpy as np
 import holidays
 import re
 
+
 def drop(df):
     df.dropna(inplace=True)
     df = df[df["כמות"] > 0]
@@ -614,7 +615,7 @@ def sort_by_date(df):
     df["Date"] = pd.to_datetime(df["Date"])
     return df.sort_values("Date")
 
-def prepare_data(df):
+def prepare_data(df, model, index_to_category):
     df = drop(df)
     df = convert_date(df)
     df = split_rows_by_category_and_quantity(df)
