@@ -22,6 +22,7 @@ We compared several advanced forecasting models, including:
 - Prophet
 - XGBoost
 - XGBoost + SARIMA
+  
 After thorough testing, DeepAR proved to be the best model for our data and goals.
 
 # From Data to Decisions
