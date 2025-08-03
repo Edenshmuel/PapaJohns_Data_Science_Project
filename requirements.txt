@@ -10,8 +10,9 @@
 #holidays
 
 streamlit==1.30.0
+setuptools==68.2.2
 
-# DeepAR + תלותיו
+# DeepAR 
 gluonts==0.10.7
 mxnet==1.8.0.post0
 
@@ -25,6 +26,7 @@ scikit-learn==0.24.2
 tqdm
 joblib
 holidays
+
 
 
 
